@@ -1,67 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Met Éireann</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Met Eireann Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: -apple-system, sans-serif; background-color: #003366; color: white; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; }
-        .card { width: 85%; max-width: 320px; padding: 40px 20px; background: rgba(255,255,255,0.1); border-radius: 25px; backdrop-filter: blur(10px); }
-        h1 { font-size: 0.8rem; color: #FFD700; letter-spacing: 2px; }
-        #temp { font-size: 5.5rem; font-weight: 200; margin: 10px 0; }
-        #rain { background: #0055aa; padding: 10px; border-radius: 12px; margin: 15px 0; font-size: 0.9rem; }
-        #loc { font-size: 0.7rem; opacity: 0.6; margin-bottom: 20px; }
-        button { background: #FFD700; color: #003366; border: none; padding: 12px 25px; border-radius: 50px; font-weight: bold; width: 100%; }
+        body { font-family: sans-serif; background: #003366; color: white; text-align: center; padding-top: 50px; }
+        .box { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 20px; display: inline-block; }
+        #temp { font-size: 4rem; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>LOCAL WEATHER</h1>
-        <div id="temp">--°</div>
-        <div id="rain">Checking Rain...</div>
-        <div id="loc">Loading...</div>
-        <button onclick="location.reload()">REFRESH</button>
+    <div class="box">
+        <h2>Galway Weather</h2>
+        <div id="temp">Loading...</div>
+        <div id="status">Connecting...</div>
+        <br>
+        <button onclick="location.reload()" style="padding:10px; border-radius:10px;">REFRESH</button>
     </div>
 
     <script>
-        async function fetchWeather(lat, lon, label) {
-            const tempDiv = document.getElementById('temp');
-            const rainDiv = document.getElementById('rain');
-            const locDiv = document.getElementById('loc');
-            
-            // This is the most reliable "AllOrigins" proxy for Safari
-            const url = `https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=${lat.toFixed(2)};long=${lon.toFixed(2)}`;
-            const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        async function testFetch() {
+            // Using a different proxy: corsproxy.io
+            const target = "https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=53.27;long=-9.05";
+            const url = "https://corsproxy.io/?" + encodeURIComponent(target);
 
             try {
-                const response = await fetch(proxy);
-                const data = await response.json();
+                const response = await fetch(url);
+                const text = await response.text();
                 const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                const xmlDoc = parser.parseFromString(text, "text/xml");
                 
                 const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
-                const rain = xmlDoc.getElementsByTagName("precipitation")[0].getAttribute("value");
-                
-                tempDiv.innerText = Math.round(temp) + "°";
-                rainDiv.innerText = rain > 0 ? `Rain: ${rain}mm next hr` : "Dry for now";
-                locDiv.innerText = label;
+                document.getElementById('temp').innerText = Math.round(temp) + "°";
+                document.getElementById('status').innerText = "Connection Successful";
             } catch (e) {
-                rainDiv.innerText = "Check Connection";
+                document.getElementById('status').innerText = "Connection Failed";
+                console.log(e);
             }
         }
-
-        // 1. Immediately load Galway so the app isn't blank
-        fetchWeather(53.27, -9.05, "Galway City (Default)");
-
-        // 2. Then try to get exact location
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (p) => fetchWeather(p.coords.latitude, p.coords.longitude, "Your Exact Location"),
-                (err) => console.log("Using default location"),
-                { timeout: 3000 }
-            );
-        }
+        testFetch();
     </script>
 </body>
 </html>
