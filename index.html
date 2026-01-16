@@ -1,44 +1,59 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Met Eireann Test</title>
+    <title>Met Eireann App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: sans-serif; background: #003366; color: white; text-align: center; padding-top: 50px; }
-        .box { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 20px; display: inline-block; }
-        #temp { font-size: 4rem; }
+        body { font-family: -apple-system, sans-serif; background: #003366; color: white; text-align: center; padding: 50px 20px; }
+        .card { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 25px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+        h1 { font-size: 0.9rem; color: #FFD700; letter-spacing: 2px; }
+        #forecast { font-size: 1.2rem; margin: 20px 0; line-height: 1.4; }
+        .btn { display: inline-block; background: #FFD700; color: #003366; padding: 12px 25px; border-radius: 50px; font-weight: bold; text-decoration: none; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>Galway Weather</h2>
-        <div id="temp">Loading...</div>
+    <div class="card">
+        <h1>REGIONAL FORECAST</h1>
+        <div id="forecast">Loading regional data...</div>
         <div id="status">Connecting...</div>
-        <br>
-        <button onclick="location.reload()" style="padding:10px; border-radius:10px;">REFRESH</button>
+        <a href="#" class="btn" onclick="location.reload()">REFRESH</a>
     </div>
 
     <script>
-        async function testFetch() {
-            // Using a different proxy: corsproxy.io
-            const target = "https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=53.27;long=-9.05";
-            const url = "https://corsproxy.io/?" + encodeURIComponent(target);
-
+        async function getRegionalData() {
+            // Using Met Eireann's direct JSON feed for Dublin/Leinster
+            // This bypasses the XML/Proxy issues entirely
+            const url = "https://www.met.ie/Open_Data/json/Dublin.json";
+            
             try {
                 const response = await fetch(url);
-                const text = await response.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, "text/xml");
+                const data = await response.json();
                 
-                const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
-                document.getElementById('temp').innerText = Math.round(temp) + "°";
-                document.getElementById('status').innerText = "Connection Successful";
+                // This pulls the text forecast for the day
+                const todayForecast = data.forecast[0].forecast;
+                
+                document.getElementById('forecast').innerText = todayForecast;
+                document.getElementById('status').innerText = "Updated Live";
             } catch (e) {
-                document.getElementById('status').innerText = "Connection Failed";
-                console.log(e);
+                document.getElementById('status').innerText = "Direct Link Failed - Trying Proxy...";
+                tryProxyFallback();
             }
         }
-        testFetch();
+
+        async function tryProxyFallback() {
+            const url = "https://api.allorigins.win/get?url=" + encodeURIComponent("https://www.met.ie/Open_Data/json/Dublin.json");
+            try {
+                const response = await fetch(url);
+                const json = await response.json();
+                const data = JSON.parse(json.contents);
+                document.getElementById('forecast').innerText = data.forecast[0].forecast;
+                document.getElementById('status').innerText = "Updated (via Bridge)";
+            } catch (e) {
+                document.getElementById('status').innerText = "All connections blocked by Safari.";
+            }
+        }
+
+        getRegionalData();
     </script>
 </body>
 </html>
