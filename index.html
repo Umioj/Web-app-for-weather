@@ -9,63 +9,66 @@
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; background-color: #003366; color: white; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
         .app-container { text-align: center; width: 90%; max-width: 350px; padding: 40px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 30px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        h1 { font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: #FFD700; margin-bottom: 20px; }
+        h1 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; color: #FFD700; margin-bottom: 10px; }
         .temp-display { font-size: 6rem; font-weight: 200; margin: 0; line-height: 1; }
-        .location-label { font-size: 0.9rem; opacity: 0.7; margin-top: 15px; }
-        #status { margin-top: 30px; font-size: 0.7rem; background: #FFD700; color: #003366; display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .rain-box { margin: 20px 0; padding: 10px; background: rgba(0, 150, 255, 0.2); border-radius: 15px; font-weight: bold; }
+        .location-label { font-size: 0.8rem; opacity: 0.6; margin-top: 10px; }
+        #status { margin-top: 25px; font-size: 0.6rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; }
+        .btn { margin-top: 15px; display: inline-block; padding: 8px 15px; background: #FFD700; color: #003366; border-radius: 20px; font-weight: bold; font-size: 0.8rem; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body>
+
     <div class="app-container">
         <h1>Local Weather</h1>
         <p class="temp-display" id="temp">--°</p>
-        <p class="location-label" id="loc">Detecting...</p>
-        <div id="status" onclick="location.reload()">REFRESH</div>
+        
+        <div class="rain-box" id="rain">Rain: Checking...</div>
+
+        <p class="location-label" id="loc">Detecting location...</p>
+        <div class="btn" onclick="location.reload()">REFRESH</div>
+        <div id="status">Syncing with Met Éireann...</div>
     </div>
 
     <script>
         async function getMetData(lat, lon, isDefault = false) {
             const statusDiv = document.getElementById('status');
-            const locDiv = document.getElementById('loc');
-            
-            // Using a more reliable CORS proxy
             const proxy = "https://api.allorigins.win/raw?url=";
             const target = `https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=${lat.toFixed(2)};long=${lon.toFixed(2)}`;
             
             try {
                 const response = await fetch(proxy + encodeURIComponent(target));
-                if (!response.ok) throw new Error('Network error');
                 const text = await response.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(text, "text/xml");
                 
+                // 1. Get Temperature
                 const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
+                
+                // 2. Get Precipitation (Next 1 hour)
+                const rainValue = xmlDoc.getElementsByTagName("precipitation")[0].getAttribute("value");
+                let rainText = rainValue > 0 ? `Rain: ${rainValue}mm` : "Dry for now";
+                
                 document.getElementById('temp').innerText = Math.round(temp) + "°";
-                statusDiv.innerText = "LIVE DATA";
-                locDiv.innerText = isDefault ? "Galway City (Default)" : "Your Exact Location";
+                document.getElementById('rain').innerText = rainText;
+                document.getElementById('loc').innerText = isDefault ? "Galway City" : "Your Location";
+                
+                const now = new Date();
+                statusDiv.innerText = "Updated at " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             } catch (err) {
-                statusDiv.innerText = "RETRYING...";
-                console.error(err);
+                statusDiv.innerText = "Connection Error";
             }
         }
 
-        function startApp() {
-            if (navigator.geolocation) {
-                // Set a 5-second timeout for GPS, then default to Galway
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => getMetData(pos.coords.latitude, pos.coords.longitude),
-                    (err) => {
-                        console.warn("GPS failed, using Galway default");
-                        getMetData(53.27, -9.05, true); // Galway coords
-                    },
-                    { timeout: 5000 }
-                );
-            } else {
-                getMetData(53.27, -9.05, true);
-            }
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => getMetData(pos.coords.latitude, pos.coords.longitude),
+                () => getMetData(53.27, -9.05, true), // Default to Galway
+                { timeout: 6000 }
+            );
+        } else {
+            getMetData(53.27, -9.05, true);
         }
-
-        startApp();
     </script>
 </body>
 </html>
