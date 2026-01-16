@@ -6,102 +6,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
     <style>
-        body { 
-            font-family: -apple-system, system-ui, sans-serif; 
-            background-color: #003366; /* Met Eireann Dark Blue */
-            color: white; 
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .app-container {
-            text-align: center;
-            width: 90%;
-            max-width: 350px;
-            padding: 40px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 30px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        h1 { 
-            font-size: 1rem; 
-            text-transform: uppercase; 
-            letter-spacing: 2px; 
-            color: #FFD700; /* Met Eireann Yellow */
-            margin-bottom: 20px;
-        }
-        .temp-display { 
-            font-size: 6rem; 
-            font-weight: 200; 
-            margin: 0;
-            line-height: 1;
-        }
-        .location-label {
-            font-size: 0.9rem;
-            opacity: 0.7;
-            margin-top: 15px;
-        }
-        #status {
-            margin-top: 30px;
-            font-size: 0.7rem;
-            background: #FFD700;
-            color: #003366;
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-        }
+        body { font-family: -apple-system, system-ui, sans-serif; background-color: #003366; color: white; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .app-container { text-align: center; width: 90%; max-width: 350px; padding: 40px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 30px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        h1 { font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: #FFD700; margin-bottom: 20px; }
+        .temp-display { font-size: 6rem; font-weight: 200; margin: 0; line-height: 1; }
+        .location-label { font-size: 0.9rem; opacity: 0.7; margin-top: 15px; }
+        #status { margin-top: 30px; font-size: 0.7rem; background: #FFD700; color: #003366; display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-
     <div class="app-container">
         <h1>Local Weather</h1>
         <p class="temp-display" id="temp">--°</p>
-        <p class="location-label" id="loc">Finding location...</p>
-        <div id="status">Connecting...</div>
+        <p class="location-label" id="loc">Detecting...</p>
+        <div id="status" onclick="location.reload()">REFRESH</div>
     </div>
 
     <script>
-        async function getMetData(lat, lon) {
+        async function getMetData(lat, lon, isDefault = false) {
             const statusDiv = document.getElementById('status');
-            // Using a proxy to bypass browser security (CORS)
+            const locDiv = document.getElementById('loc');
+            
+            // Using a more reliable CORS proxy
             const proxy = "https://api.allorigins.win/raw?url=";
             const target = `https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=${lat.toFixed(2)};long=${lon.toFixed(2)}`;
             
             try {
                 const response = await fetch(proxy + encodeURIComponent(target));
+                if (!response.ok) throw new Error('Network error');
                 const text = await response.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(text, "text/xml");
                 
-                // Get the first temperature entry
                 const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
-                
                 document.getElementById('temp').innerText = Math.round(temp) + "°";
                 statusDiv.innerText = "LIVE DATA";
-                document.getElementById('loc').innerText = "Current Location (Galway Area)";
+                locDiv.innerText = isDefault ? "Galway City (Default)" : "Your Exact Location";
             } catch (err) {
-                statusDiv.innerText = "OFFLINE";
+                statusDiv.innerText = "RETRYING...";
                 console.error(err);
             }
         }
 
-        // Trigger GPS
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => getMetData(pos.coords.latitude, pos.coords.longitude),
-                () => { document.getElementById('status').innerText = "GPS DENIED"; }
-            );
-        } else {
-            document.getElementById('status').innerText = "NO GPS SUPPORT";
+        function startApp() {
+            if (navigator.geolocation) {
+                // Set a 5-second timeout for GPS, then default to Galway
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => getMetData(pos.coords.latitude, pos.coords.longitude),
+                    (err) => {
+                        console.warn("GPS failed, using Galway default");
+                        getMetData(53.27, -9.05, true); // Galway coords
+                    },
+                    { timeout: 5000 }
+                );
+            } else {
+                getMetData(53.27, -9.05, true);
+            }
         }
+
+        startApp();
     </script>
 </body>
 </html>
