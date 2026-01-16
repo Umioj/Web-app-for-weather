@@ -5,16 +5,15 @@
     <title>Met Éireann Local</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; background-color: #003366; color: white; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .app-container { text-align: center; width: 90%; max-width: 350px; padding: 40px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 30px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        h1 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; color: #FFD700; margin-bottom: 10px; }
-        .temp-display { font-size: 6rem; font-weight: 200; margin: 0; line-height: 1; }
-        .rain-box { margin: 20px 0; padding: 10px; background: rgba(0, 150, 255, 0.2); border-radius: 15px; font-weight: bold; }
+        body { font-family: -apple-system, system-ui, sans-serif; background-color: #003366; color: white; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; }
+        .app-container { width: 90%; max-width: 350px; padding: 40px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 30px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        h1 { font-size: 0.9rem; text-transform: uppercase; color: #FFD700; margin-bottom: 10px; }
+        .temp-display { font-size: 6rem; font-weight: 200; margin: 0; }
+        .rain-box { margin: 15px 0; padding: 12px; background: rgba(0, 150, 255, 0.2); border-radius: 15px; font-weight: bold; }
         .location-label { font-size: 0.8rem; opacity: 0.6; margin-top: 10px; }
-        #status { margin-top: 25px; font-size: 0.6rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; }
-        .btn { margin-top: 15px; display: inline-block; padding: 8px 15px; background: #FFD700; color: #003366; border-radius: 20px; font-weight: bold; font-size: 0.8rem; text-decoration: none; cursor: pointer; }
+        .btn { margin-top: 20px; display: inline-block; padding: 10px 20px; background: #FFD700; color: #003366; border-radius: 20px; font-weight: bold; text-decoration: none; }
+        #status { margin-top: 20px; font-size: 0.7rem; color: #FFD700; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -22,49 +21,57 @@
     <div class="app-container">
         <h1>Local Weather</h1>
         <p class="temp-display" id="temp">--°</p>
-        
-        <div class="rain-box" id="rain">Rain: Checking...</div>
-
-        <p class="location-label" id="loc">Detecting location...</p>
-        <div class="btn" onclick="location.reload()">REFRESH</div>
-        <div id="status">Syncing with Met Éireann...</div>
+        <div class="rain-box" id="rain">Checking Rain...</div>
+        <p class="location-label" id="loc">Detecting Location...</p>
+        <div class="btn" onclick="location.reload()">REFRESH APP</div>
+        <div id="status">INITIALIZING...</div>
     </div>
 
     <script>
         async function getMetData(lat, lon, isDefault = false) {
             const statusDiv = document.getElementById('status');
-            const proxy = "https://api.allorigins.win/raw?url=";
+            const rainDiv = document.getElementById('rain');
+            const locDiv = document.getElementById('loc');
+            
+            // Try different proxies if one fails
+            const proxies = [
+                "https://api.allorigins.win/raw?url=",
+                "https://corsproxy.io/?"
+            ];
+            
             const target = `https://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast?lat=${lat.toFixed(2)};long=${lon.toFixed(2)}`;
             
-            try {
-                const response = await fetch(proxy + encodeURIComponent(target));
-                const text = await response.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, "text/xml");
-                
-                // 1. Get Temperature
-                const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
-                
-                // 2. Get Precipitation (Next 1 hour)
-                const rainValue = xmlDoc.getElementsByTagName("precipitation")[0].getAttribute("value");
-                let rainText = rainValue > 0 ? `Rain: ${rainValue}mm` : "Dry for now";
-                
-                document.getElementById('temp').innerText = Math.round(temp) + "°";
-                document.getElementById('rain').innerText = rainText;
-                document.getElementById('loc').innerText = isDefault ? "Galway City" : "Your Location";
-                
-                const now = new Date();
-                statusDiv.innerText = "Updated at " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            } catch (err) {
-                statusDiv.innerText = "Connection Error";
+            for (let proxy of proxies) {
+                try {
+                    statusDiv.innerText = "CONNECTING TO MET ÉIREANN...";
+                    const response = await fetch(proxy + encodeURIComponent(target));
+                    if (!response.ok) throw new Error();
+                    
+                    const text = await response.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(text, "text/xml");
+                    
+                    const temp = xmlDoc.getElementsByTagName("temperature")[0].getAttribute("value");
+                    const rain = xmlDoc.getElementsByTagName("precipitation")[0].getAttribute("value");
+                    
+                    document.getElementById('temp').innerText = Math.round(temp) + "°";
+                    rainDiv.innerText = rain > 0 ? `Rain: ${rain}mm next hr` : "Dry next hour";
+                    locDiv.innerText = isDefault ? "Galway City (Default)" : "Your Location";
+                    statusDiv.innerText = "LIVE DATA LOADED";
+                    return; // Stop if successful
+                } catch (e) {
+                    console.log("Proxy failed, trying next...");
+                }
             }
+            statusDiv.innerText = "DATA ERROR - TAP REFRESH";
         }
 
+        // GPS logic with a very short 2-second wait
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => getMetData(pos.coords.latitude, pos.coords.longitude),
-                () => getMetData(53.27, -9.05, true), // Default to Galway
-                { timeout: 6000 }
+                () => getMetData(53.27, -9.05, true),
+                { timeout: 2000, enableHighAccuracy: false }
             );
         } else {
             getMetData(53.27, -9.05, true);
